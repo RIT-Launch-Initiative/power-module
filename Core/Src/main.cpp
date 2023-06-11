@@ -26,7 +26,7 @@
 #include "device/platforms/stm32/HAL_GPIODevice.h"
 #include "device/platforms/stm32/HAL_I2CDevice.h"
 #include "device/platforms/stm32/HAL_SPIDevice.h"
-#include "device/peripherals/LED/LED.h"
+#include "device/peripherals/W25Q/W25Q.h"
 
 #include "sched/macros.h"
 /* USER CODE END Includes */
@@ -62,6 +62,8 @@ static HALGPIODevice* w25q_cs = nullptr;
 static HALSPIDevice* wiz_spi = nullptr;
 static HALGPIODevice* wiz_cs = nullptr;
 
+static W25Q* w25q = nullptr;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,6 +98,84 @@ RetType wiz_spi_poll_task(void*) {
     CALL(wiz_spi->poll());
     RESET();
     return RET_SUCCESS;
+}
+
+RetType w25q_poll_task(void *) {
+    RESUME();
+    CALL(w25q->poll());
+    RESET();
+    return RET_SUCCESS;
+}
+
+RetType w25q_test_task(void*) {
+    uint8_t out_buf[] = {0x9F};
+    uint8_t in_buf[] = {0x00, 0x00, 0x00};
+    RetType ret;
+
+    RESUME();
+    swprint("Starting test task\n");
+
+    w25q_cs->set(0);
+    ret = CALL(w25q_spi->write(out_buf, 1, 10));
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#SPI write failed");
+    }
+    ret = CALL(w25q_spi->read(in_buf, 3, 10));
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#SPI read failed");
+    }
+    w25q_cs->set(1);
+    swprintx("SPI read: ", in_buf, 3);
+
+    swprint("Initializing W25Q\n");
+    if (nullptr == w25q_spi || nullptr == w25q_cs) {
+        swprint("Passed nullptr SPI or CS to w25q\n");
+    }
+    static W25Q w25q_local("Flash memory", *w25q_spi, *w25q_cs);
+    ret = CALL(w25q_local.init());
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#Failed to initialize W25Q\n");
+        goto w25q_test_end;
+    }
+
+    w25q = &w25q_local;
+    swprintf("#GRN#W25Q 0x%6x with %d blocks of %d bytes each\n",
+             w25q->m_dev_id, w25q->getNumBlocks(), w25q->getBlockSize());
+    sched_start(&w25q_poll_task, {});
+
+    /*
+    // set up input
+    uint8_t page_in[256];
+    memset(page_in, '\0', sizeof(page_in));
+    const char text[] = "Testing text for page write";
+    strncpy((char*) page_in, text, sizeof(text));
+    swprintf("Page in:\n\t%256s\n", (char*) page_in);
+    // write to this block
+    uint32_t address = 0xFFFF;
+
+	swprintf("Writing to page 0x%4x\n", address);
+	ret = CALL(w25q->write(address, page_in));
+	if (RET_SUCCESS != ret) {
+		swprint("#RED#Failed to write page\n");
+		goto w25q_test_end;
+	}
+
+	// set up output
+	uint8_t page_out[256];
+	memset(page_out, '\0', sizeof(page_out));
+	// read from page;
+	swprintf("Reading from page 0x%4x\n", address);
+	ret = CALL(w25q->read(address, page_out));
+	if (RET_SUCCESS != ret) {
+		swprint("#RED#Failed to read page\n");
+		goto w25q_test_end;
+	}
+	swprintf("Page out:\n\t%256s\n", (char*) page_out);
+*/
+    w25q_test_end:
+    swprint("Exiting flash test task\n");
+    RESET();
+    return RET_ERROR;
 }
 /* USER CODE END 0 */
 
@@ -171,19 +251,34 @@ int main(void)
     static HALGPIODevice w25q_cs_local(" CS", MEM_CS_GPIO_Port, MEM_CS_Pin);
     w25q_cs = &w25q_cs_local;
 
-    sched_start(&i2c_poll_task, {});
-    sched_start(&wiz_spi_poll_task, {});
-    sched_start(&w25q_spi_poll_task, {});
+    swprint("Testing power module with task\n");
 
-    swprint("Testing power module\n");
+    uint8_t out_buffer[] = {0x9F};
+    uint8_t in_buffer[] = {0x00, 0x00, 0x00};
+
+    swprintx("Writing: ", out_buffer, sizeof(out_buffer));
+
+    HAL_GPIO_WritePin(MEM_CS_GPIO_Port, MEM_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi2, out_buffer, sizeof(out_buffer), 200);
+    HAL_SPI_Receive(&hspi2, in_buffer, sizeof(in_buffer), 200);
+    HAL_GPIO_WritePin(MEM_CS_GPIO_Port, MEM_CS_Pin, GPIO_PIN_SET);
+
+    swprintx("Received: ", in_buffer, 3);
+
+//    sched_start(&i2c_poll_task, {});
+//    sched_start(&wiz_spi_poll_task, {});
+    sched_start(&w25q_spi_poll_task, {});
+//    sched_start(&w25q_poll_task, {});
+    sched_start(&w25q_test_task, {});
+
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1)
     {
-        /* USER CODE END WHILE */
         sched_dispatch();
+        /* USER CODE END WHILE */
         /* USER CODE BEGIN 3 */
     }
     /* USER CODE END 3 */
