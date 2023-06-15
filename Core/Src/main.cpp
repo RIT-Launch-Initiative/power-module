@@ -103,60 +103,117 @@ RetType wiz_spi_poll_task(void*) {
 RetType w25q_poll_task(void *) {
     RESUME();
     CALL(w25q->poll());
-    SLEEP(1);
+//    SLEEP(1);
+    RESET();
+    return RET_SUCCESS;
+}
+
+RetType w25q_psuedoerase_test(uint32_t addr) {
+    static uint8_t buf[256];
+    RetType ret;
+    RESUME();
+
+    memset(buf, 0xFFU, sizeof(buf));
+    ret = CALL(w25q->write(addr, buf));
+
+    swprintf("Erasing 0x%04X\n", addr);
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#Failed to erase page\n");
+        RESET();
+        return RET_ERROR;
+    }
+    RESET();
+    return RET_SUCCESS;
+}
+
+RetType w25q_write_test(uint32_t addr, const char* message) {
+    static uint8_t buf[256];
+    RetType ret;
+    if (strlen(message) > 255) {
+        return RET_ERROR;
+    }
+
+    RESUME();
+
+    memset(buf, 0, sizeof(buf));
+    memcpy(buf, message, strlen(message) + 1);
+    ret = CALL(w25q->write(addr, buf));
+
+    swprintf("Writing to 0x%04X: %s\n", addr, message);
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#Failed to write page\n");
+        RESET();
+        return RET_ERROR;
+    }
+
+    RESET();
+    return RET_SUCCESS;
+};
+
+RetType w25q_read_test(uint32_t addr) {
+    static uint8_t buf[256];
+    RetType ret;
+
+    RESUME();
+
+    memset(buf, 0, sizeof(buf));
+
+    ret = CALL(w25q->read(addr, buf));
+    if (RET_SUCCESS != ret) {
+        swprint("#RED#Failed to write page\n");
+        RESET();
+        return RET_ERROR;
+    }
+
+    swprintf("Read from 0x%04X: %s\n", addr, (char*) buf);
     RESET();
     return RET_SUCCESS;
 }
 
 RetType w25q_test_task(void*) {
-    uint32_t address = 0xFFFF;
-    const char text[] = "Testing text for page write";
+    const char text[] = "Overwriting old text";
     RetType ret;
-    RESUME();
-    swprint("Starting test task\n");
 
+    RESUME();
+
+    /// Initialize peripheral
     swprint("Initializing W25Q\n");
     static W25Q w25q_local("Flash memory", *w25q_spi, *w25q_cs);
     ret = CALL(w25q_local.init());
+
     if (RET_SUCCESS != ret) {
         swprint("#RED#Failed to initialize W25Q\n");
         goto w25q_test_end;
     }
 
     w25q = &w25q_local;
-    swprintf("#GRN#W25Q 0x%6x with %d blocks of %d bytes each\n",
+    swprintf("#GRN#W25Q 0x%6X with %d blocks of %d bytes each\n",
              w25q->m_dev_id, w25q->getNumBlocks(), w25q->getBlockSize());
     sched_start(&w25q_poll_task, {});
 
-    // set up input
-    uint8_t page_in[256];
-    memset(page_in, '\0', sizeof(page_in));
-    strncpy((char*) page_in, text, sizeof(text));
-    swprintf("Page in:\n\t%27s\n", (char*) page_in);
-    // write to this block
+    /// Perform the tests
 
-	swprintf("Writing to page 0x%04x\n", address);
-	ret = CALL(w25q->write(address, page_in));
-	if (RET_SUCCESS != ret) {
-		swprint("#RED#Failed to write page\n");
-		goto w25q_test_end;
-	}
+    swprint("#GRN#First write\n");
+    CALL(w25q_write_test(0xFFFF, "Last page test"));
+    CALL(w25q_write_test(0xFF00, "Underwriting"));
+    CALL(w25q_read_test(0xFF00));
+    CALL(w25q_read_test(0xFFFF));
 
-    SLEEP(5);
-	// set up output
-	uint8_t page_out[256];
-	memset(page_out, '\0', sizeof(page_out));
-	// read from page;
-	swprintf("Reading from page 0x%04x\n", address);
-	ret = CALL(w25q->read(address, page_out));
-	if (RET_SUCCESS != ret) {
-		swprint("#RED#Failed to read page\n");
-		goto w25q_test_end;
-	}
+    swprint("#GRN#Sector erase\n");
+    CALL(w25q->erase(w25q->SECTOR_ERASE, 0xFF00));
+    CALL(w25q_read_test(0xFF00));
+    CALL(w25q_write_test(0xFF00, "Overwriting"));
+    CALL(w25q_read_test(0xFF00));
+    CALL(w25q_read_test(0xFFFF));
 
-	swprintf("Page out:\n\t%27s\n", (char*) page_out);
+    swprint("#GRN#Chip Erase\n");
+    CALL(w25q->erase(w25q->CHIP_ERASE, 0));
+    CALL(w25q_read_test(0xFF00));
+    CALL(w25q_read_test(0xFFFF));
 
-    w25q_test_end:
+
+
+w25q_test_end:
     swprint("Exiting flash test task\n");
     RESET();
     return RET_ERROR;
@@ -240,7 +297,6 @@ int main(void)
 //    sched_start(&i2c_poll_task, {});
 //    sched_start(&wiz_spi_poll_task, {});
     sched_start(&w25q_spi_poll_task, {});
-//    sched_start(&w25q_poll_task, {});
     sched_start(&w25q_test_task, {});
 
     /* USER CODE END 2 */
