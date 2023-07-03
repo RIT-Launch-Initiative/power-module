@@ -270,7 +270,7 @@ int main(void) {
     static HALGPIODevice wiz_cs_local("Wiznet CS", ETH_CS_GPIO_Port, ETH_CS_Pin);
     wiz_cs = &wiz_cs_local;
 
-    static HALGPIODevice w25q_cs_local(" CS", MEM_CS_GPIO_Port, MEM_CS_Pin);
+    static HALGPIODevice w25q_cs_local("W25Q CS", MEM_CS_GPIO_Port, MEM_CS_Pin);
     w25q_cs = &w25q_cs_local;
 
     sched_start(&i2c_poll_task, {});
