@@ -50,7 +50,7 @@ else ()
 endif ()
 
 set(LAUNCH_CORE_DIR extern/launch-core)
-set(LAUNCH_CORE_SOURCES "${LAUNCH_CORE_DIR}/device/device.cpp"
+set(LAUNCH_CORE_SOURCES "${LAUNCH_CORE_DIR}/device/Device.cpp"
     "${LAUNCH_CORE_DIR}/sched/sched.cpp"
     "${LAUNCH_CORE_DIR}/device/platforms/stm32/HAL_SPI_Handlers.cpp"
     "${LAUNCH_CORE_DIR}/device/platforms/stm32/HAL_I2C_Handlers.cpp")
@@ -61,7 +61,7 @@ add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx)
 
 file(GLOB_RECURSE SOURCES "Core/*.*" "Drivers/*.*" ${LAUNCH_CORE_SOURCES})
 
-set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F446RETX_FLASH.ld)
+set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F446RETx_FLASH.ld)
 
 add_link_options(-Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR}/${PROJECT_NAME}.map)
 add_link_options(-mcpu=cortex-m4 -mthumb -mthumb-interwork)

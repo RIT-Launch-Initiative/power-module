@@ -29,6 +29,7 @@
 #include "device/peripherals/LED/LED.h"
 
 #include "sched/macros.h"
+#include "networking.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,20 +57,23 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart5;
 /* USER CODE BEGIN PV */
 
-static HALI2CDevice* i2c = nullptr;
-static HALSPIDevice* w25q_spi = nullptr;
-static HALGPIODevice* w25q_cs = nullptr;
-static HALSPIDevice* wiz_spi = nullptr;
-static HALGPIODevice* wiz_cs = nullptr;
+static HALI2CDevice *i2c = nullptr;
+static HALSPIDevice *w25q_spi = nullptr;
+static HALGPIODevice *w25q_cs = nullptr;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+
 static void MX_GPIO_Init(void);
+
 static void MX_ADC1_Init(void);
+
 static void MX_SPI1_Init(void);
+
 static void MX_SPI2_Init(void);
+
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -77,34 +81,27 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-RetType i2c_poll_task(void*) {
+RetType i2c_poll_task(void *) {
     RESUME();
     CALL(i2c->poll());
     RESET();
     return RET_SUCCESS;
 }
 
-RetType w25q_spi_poll_task(void*) {
+RetType spi_poll_task(void *) {
     RESUME();
     CALL(w25q_spi->poll());
     RESET();
     return RET_SUCCESS;
 }
 
-RetType wiz_spi_poll_task(void*) {
-    RESUME();
-    CALL(wiz_spi->poll());
-    RESET();
-    return RET_SUCCESS;
-}
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
-int main(void)
-{
+int main(void) {
     /* USER CODE BEGIN 1 */
 
     /* USER CODE END 1 */
@@ -168,20 +165,19 @@ int main(void)
     static HALGPIODevice wiz_cs_local("Wiznet CS", ETH_CS_GPIO_Port, ETH_CS_Pin);
     wiz_cs = &wiz_cs_local;
 
-    static HALGPIODevice w25q_cs_local(" CS", MEM_CS_GPIO_Port, MEM_CS_Pin);
+    static HALGPIODevice w25q_cs_local("W25Q CS", MEM_CS_GPIO_Port, MEM_CS_Pin);
     w25q_cs = &w25q_cs_local;
 
     sched_start(&i2c_poll_task, {});
-    sched_start(&wiz_spi_poll_task, {});
-    sched_start(&w25q_spi_poll_task, {});
+    sched_start(&spi_poll_task, {});
+    sched_start(&netStackInitTask, {});
 
     swprint("Testing power module\n");
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    while (1)
-    {
+    while (1) {
         /* USER CODE END WHILE */
         sched_dispatch();
         /* USER CODE BEGIN 3 */
@@ -193,8 +189,7 @@ int main(void)
   * @brief System Clock Configuration
   * @retval None
   */
-void SystemClock_Config(void)
-{
+void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
@@ -210,22 +205,20 @@ void SystemClock_Config(void)
     RCC_OscInitStruct.HSIState = RCC_HSI_ON;
     RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
         Error_Handler();
     }
 
     /** Initializes the CPU, AHB and APB buses clocks
     */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                  |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                                  | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-    {
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
         Error_Handler();
     }
 }
@@ -235,8 +228,7 @@ void SystemClock_Config(void)
   * @param None
   * @retval None
   */
-static void MX_ADC1_Init(void)
-{
+static void MX_ADC1_Init(void) {
 
     /* USER CODE BEGIN ADC1_Init 0 */
 
@@ -262,8 +254,7 @@ static void MX_ADC1_Init(void)
     hadc1.Init.NbrOfConversion = 1;
     hadc1.Init.DMAContinuousRequests = DISABLE;
     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-    if (HAL_ADC_Init(&hadc1) != HAL_OK)
-    {
+    if (HAL_ADC_Init(&hadc1) != HAL_OK) {
         Error_Handler();
     }
 
@@ -272,8 +263,7 @@ static void MX_ADC1_Init(void)
     sConfig.Channel = ADC_CHANNEL_4;
     sConfig.Rank = 1;
     sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-    {
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
     }
     /* USER CODE BEGIN ADC1_Init 2 */
@@ -287,8 +277,7 @@ static void MX_ADC1_Init(void)
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
-{
+static void MX_I2C1_Init(void) {
 
     /* USER CODE BEGIN I2C1_Init 0 */
 
@@ -306,8 +295,7 @@ static void MX_I2C1_Init(void)
     hi2c1.Init.OwnAddress2 = 0;
     hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-    if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-    {
+    if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
         Error_Handler();
     }
     /* USER CODE BEGIN I2C1_Init 2 */
@@ -321,8 +309,7 @@ static void MX_I2C1_Init(void)
   * @param None
   * @retval None
   */
-static void MX_SPI1_Init(void)
-{
+static void MX_SPI1_Init(void) {
 
     /* USER CODE BEGIN SPI1_Init 0 */
 
@@ -344,8 +331,7 @@ static void MX_SPI1_Init(void)
     hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
     hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
     hspi1.Init.CRCPolynomial = 10;
-    if (HAL_SPI_Init(&hspi1) != HAL_OK)
-    {
+    if (HAL_SPI_Init(&hspi1) != HAL_OK) {
         Error_Handler();
     }
     /* USER CODE BEGIN SPI1_Init 2 */
@@ -359,8 +345,7 @@ static void MX_SPI1_Init(void)
   * @param None
   * @retval None
   */
-static void MX_SPI2_Init(void)
-{
+static void MX_SPI2_Init(void) {
 
     /* USER CODE BEGIN SPI2_Init 0 */
 
@@ -382,8 +367,7 @@ static void MX_SPI2_Init(void)
     hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
     hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
     hspi2.Init.CRCPolynomial = 10;
-    if (HAL_SPI_Init(&hspi2) != HAL_OK)
-    {
+    if (HAL_SPI_Init(&hspi2) != HAL_OK) {
         Error_Handler();
     }
     /* USER CODE BEGIN SPI2_Init 2 */
@@ -397,8 +381,7 @@ static void MX_SPI2_Init(void)
   * @param None
   * @retval None
   */
-static void MX_UART5_Init(void)
-{
+static void MX_UART5_Init(void) {
 
     /* USER CODE BEGIN UART5_Init 0 */
 
@@ -415,8 +398,7 @@ static void MX_UART5_Init(void)
     huart5.Init.Mode = UART_MODE_TX_RX;
     huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart5.Init.OverSampling = UART_OVERSAMPLING_16;
-    if (HAL_UART_Init(&huart5) != HAL_OK)
-    {
+    if (HAL_UART_Init(&huart5) != HAL_OK) {
         Error_Handler();
     }
     /* USER CODE BEGIN UART5_Init 2 */
@@ -430,8 +412,7 @@ static void MX_UART5_Init(void)
   * @param None
   * @retval None
   */
-static void MX_GPIO_Init(void)
-{
+static void MX_GPIO_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     /* GPIO Ports Clock Enable */
@@ -441,19 +422,19 @@ static void MX_GPIO_Init(void)
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOA, ETH_CS_Pin|ETH_RST_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, ETH_CS_Pin | ETH_RST_Pin, GPIO_PIN_SET);
 
     /*Configure GPIO pin Output Level */
     HAL_GPIO_WritePin(MEM_CS_GPIO_Port, MEM_CS_Pin, GPIO_PIN_SET);
 
     /*Configure GPIO pins : ADDR0_Pin ADDR1_Pin ADDR2_Pin ADDR3_Pin */
-    GPIO_InitStruct.Pin = ADDR0_Pin|ADDR1_Pin|ADDR2_Pin|ADDR3_Pin;
+    GPIO_InitStruct.Pin = ADDR0_Pin | ADDR1_Pin | ADDR2_Pin | ADDR3_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     /*Configure GPIO pins : ETH_CS_Pin ETH_RST_Pin */
-    GPIO_InitStruct.Pin = ETH_CS_Pin|ETH_RST_Pin;
+    GPIO_InitStruct.Pin = ETH_CS_Pin | ETH_RST_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -486,13 +467,11 @@ static void MX_GPIO_Init(void)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-void Error_Handler(void)
-{
+void Error_Handler(void) {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
-    while (1)
-    {
+    while (1) {
     }
     /* USER CODE END Error_Handler_Debug */
 }
