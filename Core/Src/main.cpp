@@ -95,10 +95,6 @@ RetType spi_poll_task(void *) {
     return RET_SUCCESS;
 }
 
-
-
-
-
 /* USER CODE END 0 */
 
 /**
