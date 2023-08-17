@@ -44,14 +44,16 @@ RetType wiz_spi_poll_task(void *) {
 RetType wizSendTestTask(void *) {
     RESUME();
     static IPv4UDPSocket::addr_t addr;
-    addr.ip[0] = 10;
-    addr.ip[1] = 10;
-    addr.ip[2] = 10;
-    addr.ip[3] = 69;
+    addr.ip[0] = 239;
+    addr.ip[1] = 255;
+    addr.ip[2] = 255;
+    addr.ip[3] = 255;
     addr.port = 8000;
 
     static uint8_t buff[7] = {'L', 'a', 'u', 'n', 'c', 'h', '!'};
     RetType ret = CALL(sock->send(buff, 7, &addr));
+
+    SLEEP(2000);
 
     RESET();
     return RET_SUCCESS;
@@ -81,7 +83,7 @@ RetType netStackInitTask(void *) {
     sock->bind(addr); // TODO: Error handling
 
     ipv4::IPv4Addr_t temp_addr;
-    ipv4::IPv4Address(10, 10, 10, 69, &temp_addr);
+    ipv4::IPv4Address(239, 255, 255, 255, &temp_addr);
     stack->add_multicast(temp_addr);
 
     RetType ret = CALL(wiznet.init());
@@ -100,7 +102,6 @@ RetType netStackInitTask(void *) {
     }
 
     swprint("Successfully initialized network interface\n");
-    tid_t tid = sched_start(PollDevice, (void *) w5500);
     sched_start(wizSendTestTask, {});
 
     netStackInitDone:
