@@ -71,7 +71,7 @@ RetType netStackInitTask(void *) {
 
     static Packet packet = alloc::Packet<IPv4UDPSocket::MTU_NO_HEADERS - IPv4UDPSocket::HEADERS_SIZE, IPv4UDPSocket::HEADERS_SIZE>();
 
-    static Wiznet wiznet(*wiz_spi, *wiz_cs, *wiz_rst, *wiz_led_gpio, stack->get_eth(), packet);
+    static Wiznet wiznet(*wiz_spi, *wiz_cs, *wiz_rst, *wiz_led_gpio, packet);
     w5500 = &wiznet;
 
     static IPv4UDPStack iPv4UdpStack(10, 10, 10, 69, 255, 255, 255, 0, wiznet);
