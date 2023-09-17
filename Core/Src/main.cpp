@@ -27,9 +27,11 @@
 #include "device/platforms/stm32/HAL_I2CDevice.h"
 #include "device/platforms/stm32/HAL_SPIDevice.h"
 #include "device/peripherals/LED/LED.h"
+#include "device/peripherals/INA219/INA219.h"
+
 
 #include "sched/macros.h"
-#include "networking.h"
+// #include "networking.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -170,7 +172,7 @@ int main(void) {
 
     sched_start(&i2c_poll_task, {});
     sched_start(&spi_poll_task, {});
-    sched_start(&netStackInitTask, {});
+    // sched_start(&netStackInitTask, {});
 
     swprint("Testing power module\n");
     /* USER CODE END 2 */
